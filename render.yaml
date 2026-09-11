@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: bcis-wave0-migration-runner
+    runtime: node
+    region: frankfurt
+    plan: free
+    branch: bcis-wave0-runner
+    autoDeployTrigger: off
+    buildCommand: npm install --omit=dev
+    startCommand: bash .bcis-wave0/start-wave0.sh
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bcis-wave0-postgres
+          property: connectionString
