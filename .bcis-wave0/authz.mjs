@@ -22,10 +22,13 @@ const activeAt = (m, now) => {
   if (m.valid_to && new Date(m.valid_to) <= t) return false;
   return true;
 };
-const within = (value, scope) => scope == null || scope === '' || scope === value;
+
+// Security invariant: empty or missing scope never means wildcard.
+// A broader scope must be represented explicitly by policy, never inferred from null/empty.
+const within = (value, scope) => value != null && value !== '' && scope != null && scope !== '' && scope === value;
 const claimAllows = (value, scopeClaim) => {
-  const xs = asArray(scopeClaim);
-  return xs.length === 0 || xs.includes(value);
+  const xs = asArray(scopeClaim).filter((x) => x != null && x !== '');
+  return value != null && value !== '' && xs.length > 0 && xs.includes(value);
 };
 const ceilingAllows = (assetClass, ...ceilings) => {
   if (!(assetClass in CLASS_ORDER)) return false;
@@ -51,9 +54,9 @@ export function authorize({ claims, memberships, request, resource, now = new Da
     m.tenant_id === request.tenant_id &&
     activeAt(m, now) &&
     tokenRoles.has(m.role_code) &&
-    within(request.org_scope_id, m.org_scope_id) &&
     within(request.country_code, m.country_scope) &&
     within(request.project_id, m.project_scope) &&
+    (m.org_scope_id == null || m.org_scope_id === '' || within(request.org_scope_id, m.org_scope_id)) &&
     ceilingAllows(resource.classification, m.classification_ceiling)
   );
 
