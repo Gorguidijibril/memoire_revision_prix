@@ -50,18 +50,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       - name: Install dependencies
-        run: npm ci --omit=dev
+        run: npm install --omit=dev
 
-      - name: Reassemble governed SQL bundle
+      - name: Run governed Wave0 PostgreSQL gate
         run: bash .bcis-wave0/start-wave0.sh
-
-      - name: Require Wave0 PASS marker
-        if: always()
-        run: |
-          echo "The runner itself must exit non-zero on any failed gate."
 
   authorization-gate:
     name: Authorization policy gate
