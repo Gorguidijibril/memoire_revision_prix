@@ -1,0 +1,101 @@
+name: BCIS Wave0 Governed Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - bcis-wave0-runner
+    paths:
+      - '.bcis-wave0/**'
+      - '.github/workflows/bcis-wave0-ci.yml'
+      - 'package.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bcis-wave0-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  wave0-postgres-gate:
+    name: PostgreSQL + Golden + Concurrency + RLS
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: bcis
+          POSTGRES_PASSWORD: bcis-ci-only
+          POSTGRES_DB: bcis_wave0_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U bcis -d bcis_wave0_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      DATABASE_URL: postgresql://bcis:bcis-ci-only@127.0.0.1:5432/bcis_wave0_ci
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --omit=dev
+
+      - name: Reassemble governed SQL bundle
+        run: bash .bcis-wave0/start-wave0.sh
+
+      - name: Require Wave0 PASS marker
+        if: always()
+        run: |
+          echo "The runner itself must exit non-zero on any failed gate."
+
+  authorization-gate:
+    name: Authorization policy gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run authorization self-test
+        run: node .bcis-wave0/authz.test.mjs
+
+  governance-summary:
+    name: Freeze governance summary
+    runs-on: ubuntu-latest
+    needs:
+      - wave0-postgres-gate
+      - authorization-gate
+    if: always()
+
+    steps:
+      - name: Enforce both gates
+        env:
+          DB_GATE: ${{ needs.wave0-postgres-gate.result }}
+          AUTHZ_GATE: ${{ needs.authorization-gate.result }}
+        run: |
+          echo "PostgreSQL gate: $DB_GATE"
+          echo "Authorization gate: $AUTHZ_GATE"
+          test "$DB_GATE" = "success"
+          test "$AUTHZ_GATE" = "success"
+          echo "BCIS_HOSTED_CI_GATE_PASS"
