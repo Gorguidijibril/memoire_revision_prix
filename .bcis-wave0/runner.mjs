@@ -11,7 +11,10 @@ const logStage = (name, status, detail={}) => {
   const x = {name,status,at:new Date().toISOString(),...detail};
   result.stages.push(x); console.log('BCIS_GATE_STAGE', JSON.stringify(x));
 };
-const clean = s => s.replace(/^\\set\s+.*$/gm,'').replace(/^\\echo\s+.*$/gm,'');
+const clean = s => s
+  .replace(/^\uFEFF/, '')
+  .replace(/^\\set\s+.*$/gm,'')
+  .replace(/^\\echo\s+.*$/gm,'');
 const sql = rel => clean(fs.readFileSync(path.join(root, rel), 'utf8'));
 const one = async (rel, client=null) => {
   const own = !client; const c = client ?? new Client({connectionString:db, ssl:{rejectUnauthorized:false}});
