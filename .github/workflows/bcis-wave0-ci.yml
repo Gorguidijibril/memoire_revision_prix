@@ -41,6 +41,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://bcis:bcis-ci-only@127.0.0.1:5432/bcis_wave0_ci
       BCIS_DB_SSL: disable
+      BCIS_HOLD_AFTER_GATE: 'false'
       NODE_ENV: test
 
     steps:
